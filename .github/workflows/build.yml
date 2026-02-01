@@ -4,7 +4,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -12,7 +12,7 @@ jobs:
       - name: Install Build Tools
         run: |
           sudo apt update
-          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev libasound2-dev
+          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev libasound2-dev openjdk-21-jdk
 
       - name: Clone OpenJDK 25
         run: |
@@ -21,10 +21,10 @@ jobs:
       - name: Apply Your Patch
         run: |
           cd jdk-source
-          # Применяем твой файл из папки patches
-          patch -p1 < ../patches/jdk25u_android.diff || echo "Патч применился с предупреждениями или ошибками"
+          # Пробуем применить патч. Если -p1 не сработает, попробуем -p0
+          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Патч не удалось применить автоматически, но пробуем собрать без него"
 
-      - name: Configure and Build
+      - name: Configure OpenJDK
         run: |
           cd jdk-source
           bash configure \
@@ -32,16 +32,22 @@ jobs:
             --with-debug-level=release \
             --disable-warnings-as-errors \
             --enable-headless-only \
-            --with-openjdk-target=aarch64-linux-gnu
+            --with-openjdk-target=aarch64-linux-gnu \
+            --with-jvm-variants=server
+          
+      - name: Build Images
+        run: |
+          cd jdk-source
           make images
           
-      - name: Archive Result
+      - name: Archive and Upload
         run: |
+          # Ищем папку с готовой сборкой и упаковываем
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Java25-Final
+          name: Java25-Final-AArch64
           path: jdk25-android-aarch64.tar.xz

@@ -11,7 +11,17 @@ jobs:
 
       - name: Install Build Tools & Cross-Libs
         run: |
+          # Разрешаем архитектуру arm64 для пакетов
           sudo dpkg --add-architecture arm64
+          
+          # Настраиваем репозитории: amd64 на обычные сервера, arm64 на порты
+          sudo sed -i "s/deb http/deb [arch=amd64] http/g" /etc/apt/sources.list.d/* || true
+          sudo sed -i "s/deb http/deb [arch=amd64] http/g" /etc/apt/sources.list || true
+          
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc) main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -sc)-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+
           sudo apt update
           sudo apt -y install autoconf bash build-essential openjdk-21-jdk \
           gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
@@ -27,12 +37,14 @@ jobs:
 
       - name: Clone OpenJDK 25
         run: |
+          # Клонируем стабильную ветку JDK 25
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
       - name: Apply Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, continuing"
+          # Пробуем применить патч, если он есть в репозитории
+          patch -p1 < ../patches/jdk25u_android.diff || echo "Патч не применился или отсутствует, продолжаем..."
 
       - name: Configure OpenJDK
         run: |
@@ -45,16 +57,19 @@ jobs:
             --enable-headless-only \
             --with-jvm-variants=server \
             --with-native-debug-symbols=none \
-            --with-freetype=system
+            --with-freetype=system \
+            --with-x=yes
           
       - name: Build Images
         run: |
           cd jdk-source
+          # Самый долгий этап сборки
           make images
           
       - name: Archive and Upload
         if: success()
         run: |
+          # Собираем результат в архив
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           

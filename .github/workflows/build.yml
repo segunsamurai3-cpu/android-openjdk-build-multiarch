@@ -9,10 +9,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Build Tools
+      - name: Install Build Tools & Cross-Compiler
         run: |
           sudo apt update
-          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev libasound2-dev openjdk-21-jdk
+          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev \
+          libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev \
+          libasound2-dev openjdk-21-jdk gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
       - name: Clone OpenJDK 25
         run: |
@@ -21,14 +23,13 @@ jobs:
       - name: Apply Your Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Патч не применился, но пробуем дальше"
+          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Патч не применился, пробуем без него"
 
       - name: Configure OpenJDK
         run: |
           cd jdk-source
-          # Генерируем конфиг, если его нет
           bash autogen.sh
-          # Используем актуальные флаги для кросс-компиляции
+          # Исправленные флаги для OpenJDK 25
           bash configure \
             --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
             --with-debug-level=release \
@@ -46,6 +47,7 @@ jobs:
       - name: Archive and Upload
         if: success()
         run: |
+          # Переходим в папку с результатом, пакуем и загружаем
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           

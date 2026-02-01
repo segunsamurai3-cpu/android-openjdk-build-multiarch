@@ -14,11 +14,16 @@ jobs:
           sudo apt update
           sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev \
           libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev \
-          libasound2-dev openjdk-21-jdk gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          libasound2-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Clone OpenJDK 25 (Stable Branch)
+      - name: Setup Boot JDK (Java 24)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '24'
+          distribution: 'oracle' # Используем Oracle или Temurin, где уже есть 24-я
+
+      - name: Clone OpenJDK 25
         run: |
-          # Теперь скачиваем именно 25-ю версию, а не самую последнюю
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
       - name: Apply Patch
@@ -26,12 +31,12 @@ jobs:
           cd jdk-source
           patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, continuing"
 
-      - name: Configure OpenJDK 25
+      - name: Configure OpenJDK
         run: |
           cd jdk-source
           bash configure \
             --openjdk-target=aarch64-linux-gnu \
-            --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
+            --with-boot-jdk=$JAVA_HOME \
             --with-debug-level=release \
             --disable-warnings-as-errors \
             --enable-headless-only \

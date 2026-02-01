@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '24'
-          distribution: 'oracle' # Используем Oracle или Temurin, где уже есть 24-я
+          distribution: 'oracle'
 
       - name: Clone OpenJDK 25
         run: |
@@ -41,8 +41,10 @@ jobs:
             --disable-warnings-as-errors \
             --enable-headless-only \
             --with-jvm-variants=server \
-            --with-native-debug-symbols=none
-          
+            --with-native-debug-symbols=none \
+            --with-x=no \
+            --without-x
+
       - name: Build Images
         run: |
           cd jdk-source

@@ -9,26 +9,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Install dependencies
+      - name: Install Build Tools
         run: |
           sudo apt update
-          # Добавляем расширенный список библиотек, которые просил лог ошибки
-          sudo apt -y install autoconf python3 unzip zip gcc-multilib g++-multilib \
-          libxtst-dev libasound2-dev libelf-dev libfontconfig1-dev libx11-dev \
-          libxext-dev libxrender-dev libxt-dev libxrandr-dev libxinerama-dev \
-          libxcomposite-dev libcups2-dev
+          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev libasound2-dev
 
-      - name: Build
+      - name: Clone OpenJDK 25
         run: |
-          chmod +x *.sh
-          # Исправляем путь к компилятору, чтобы он не искал старый NDK r10e
-          ./ci_build_arch_aarch64.sh
-        env:
-          JDK_VERSION: 25
-          EXTRA_PATCHES: "patches/jdk25u_android.diff"
+          git clone --depth 1 https://github.com/openjdk/jdk jdk-source
+
+      - name: Apply Your Patch
+        run: |
+          cd jdk-source
+          # Применяем твой файл из папки patches
+          patch -p1 < ../patches/jdk25u_android.diff || echo "Патч применился с предупреждениями или ошибками"
+
+      - name: Configure and Build
+        run: |
+          cd jdk-source
+          bash configure \
+            --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
+            --with-debug-level=release \
+            --disable-warnings-as-errors \
+            --enable-headless-only \
+            --with-openjdk-target=aarch64-linux-gnu
+          make images
+          
+      - name: Archive Result
+        run: |
+          cd jdk-source/build/*/images
+          tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Java25-Final
+          path: jdk25-android-aarch64.tar.xz

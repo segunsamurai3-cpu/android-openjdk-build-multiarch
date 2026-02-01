@@ -30,22 +30,25 @@ jobs:
           mkdir -p deps-tmp && cd deps-tmp
           BASE_URL="http://ports.ubuntu.com/ubuntu-ports/pool/main"
           
-          # Скачиваем всё необходимое
+          # Скачиваем X11, ALSA, CUPS и Fontconfig для ARM64
           curl -L -O "$BASE_URL/libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb"
           curl -L -O "$BASE_URL/libx/libx11/libx11-6_1.8.7-1build1_arm64.deb"
           curl -L -O "$BASE_URL/x/xorgproto/x11proto-dev_2023.2-1_all.deb"
           curl -L -O "$BASE_URL/a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb"
+          curl -L -O "$BASE_URL/a/alsa-lib/libasound2t64_1.2.11-1build2_arm64.deb"
           curl -L -O "$BASE_URL/c/cups/libcups2-dev_2.4.7-1.2ubuntu7_arm64.deb"
           curl -L -O "$BASE_URL/f/fontconfig/libfontconfig-dev_2.15.0-1.1ubuntu2_arm64.deb"
           
           for f in *.deb; do dpkg-deb -x $f .; done
           
-          # Раскладываем файлы так, чтобы GCC и Configure их точно нашли
+          # Раскладываем файлы в системные пути кросс-компилятора
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
-          # Фикс конкретно для CUPS: он ищет путь include/cups/...
-          sudo mkdir -p /usr/include/cups
-          sudo cp -r usr/include/cups/* /usr/include/cups/ || true
+          
+          # Фикс путей: некоторые пакеты кладут хидеры прямо в include, а не в подпапки
+          sudo mkdir -p /usr/include/alsa /usr/include/cups
+          [ -d usr/include/alsa ] && sudo cp -r usr/include/alsa/* /usr/include/alsa/ || true
+          [ -d usr/include/cups ] && sudo cp -r usr/include/cups/* /usr/include/cups/ || true
 
       - name: Configure OpenJDK
         run: |

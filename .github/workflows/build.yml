@@ -25,25 +25,30 @@ jobs:
         run: |
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
-      - name: Download Real X11 Libs (ARM64)
+      - name: Download X11 Libs via APT (No 404 error)
         run: |
-          mkdir -p x11-arm64
+          mkdir -p x11-arm64/libs
           cd x11-arm64
-          # Скачиваем основные пакеты напрямую с серверов Ubuntu Ports
-          URL="http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.8.7-1_arm64.deb"
-          URL2="http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.8.7-1_arm64.deb"
-          URL3="http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-dev_2023.2-1_all.deb"
-          curl -L -O $URL && curl -L -O $URL2 && curl -L -O $URL3
-          # Распаковываем их без установки в систему
+          # Скачиваем пакеты через apt-get download, это надежнее прямых ссылок
+          sudo apt-get update
+          apt-get download libx11-6:arm64 libx11-dev:arm64 x11proto-dev || \
+          (echo "Fallback to direct download..." && \
+           curl -L -o x1.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb && \
+           curl -L -o x2.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.8.7-1build1_arm64.deb && \
+           curl -L -o x3.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-dev_2023.2-1_all.deb)
+          
+          # Распаковываем всё, что нашли
           for f in *.deb; do dpkg-deb -x $f .; done
-          # Создаем структуру, которую поймет OpenJDK
-          mv usr/lib/aarch64-linux-gnu lib
-          mv usr/include include
+          
+          # Подготавливаем пути для компилятора
+          mkdir -p ./lib
+          cp -r usr/lib/aarch64-linux-gnu/* ./lib/ || cp -r usr/lib/* ./lib/ || true
+          cp -r usr/include ./include
 
       - name: Apply Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, skip"
+          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch skip"
 
       - name: Configure OpenJDK
         run: |

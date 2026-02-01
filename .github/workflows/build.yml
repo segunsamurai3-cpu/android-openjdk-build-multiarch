@@ -9,7 +9,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Build Tools & Cross-Compiler
+      - name: Install Build Tools
         run: |
           sudo apt update
           sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev \
@@ -20,24 +20,23 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/openjdk/jdk jdk-source
 
-      - name: Apply Your Patch
+      - name: Apply Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Patch failed, skipping"
+          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, continuing anyway"
 
       - name: Configure OpenJDK
         run: |
           cd jdk-source
-          bash autogen.sh
-          # Пробуем максимально упрощенный синтаксис для JDK 25
+          # Важно: используем чистый bash configure без лишних оберток
           bash configure \
-            --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
             --openjdk-target=aarch64-linux-gnu \
+            --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
             --with-debug-level=release \
             --disable-warnings-as-errors \
             --enable-headless-only \
             --with-jvm-variants=server \
-            --with-native-debug-symbols=none || (cat config.log && exit 1)
+            --with-native-debug-symbols=none
           
       - name: Build Images
         run: |

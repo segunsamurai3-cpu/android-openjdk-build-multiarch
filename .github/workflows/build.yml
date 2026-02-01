@@ -28,41 +28,40 @@ jobs:
       - name: Force Inject Dependencies (ARM64)
         run: |
           mkdir -p deps-tmp && cd deps-tmp
-          # Добавляем архитектуру и обновляем списки пакетов
+          
+          # Настраиваем репозитории для ARM64 (используем ports.ubuntu.com)
           sudo dpkg --add-architecture arm64
-          sudo apt-get update
+          sudo bash -c 'cat <<EOF > /etc/apt/sources.list.d/arm64-ports.list
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+          EOF'
           
-          # Скачиваем реальные пакеты для ARM64
+          # Исключаем arm64 из основного списка, чтобы не было 404
+          sudo sed -i "s/deb http/deb [arch=amd64] http/g" /etc/apt/sources.list.d/ubuntu.sources || true
+          
+          sudo apt-get update || true # Игнорируем мелкие ошибки обновления
+          
+          # Скачиваем пакеты
           apt-get download \
-            libx11-dev:arm64 \
-            libxext-dev:arm64 \
-            libxrender-dev:arm64 \
-            libxtst-dev:arm64 \
-            libasound2-dev:arm64 \
-            libcups2-dev:arm64 \
-            libfontconfig1-dev:arm64 \
-            libffi-dev:arm64 \
-            x11proto-dev
+            libx11-dev:arm64 libxext-dev:arm64 libxrender-dev:arm64 \
+            libxtst-dev:arm64 libasound2-dev:arm64 libcups2-dev:arm64 \
+            libfontconfig1-dev:arm64 libffi-dev:arm64 x11proto-dev
           
-          # Распаковываем дебиан-пакеты в текущую папку
           for f in *.deb; do dpkg-deb -x $f .; done
           
-          # Копируем заголовки и библиотеки в системные пути кросс-компилятора
+          # Инъекция файлов
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
           
-          # Фикс структуры папок для Configure (чтобы видел alsa/asoundlib.h и т.д.)
           for dir in alsa cups fontconfig X11; do
             sudo mkdir -p /usr/include/$dir
-            if [ -d usr/include/$dir ]; then
-              sudo cp -r usr/include/$dir/* /usr/include/$dir/
-            fi
+            [ -d usr/include/$dir ] && sudo cp -r usr/include/$dir/* /usr/include/$dir/ || true
           done
 
       - name: Configure OpenJDK
         env:
           PKG_CONFIG_ALLOW_CROSS: 1
-          # Явные пути для компилятора, чтобы он "увидел" наши инъекции
           C_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
           CPLUS_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
           LIBRARY_PATH: /usr/lib/aarch64-linux-gnu
@@ -93,7 +92,6 @@ jobs:
       - name: Archive and Upload
         if: success()
         run: |
-          # Ищем готовую сборку в папке build
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           

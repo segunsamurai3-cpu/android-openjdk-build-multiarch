@@ -25,41 +25,44 @@ jobs:
         run: |
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
-      - name: Force Inject Everything (ARM64)
+      - name: Force Inject Dependencies (ARM64)
         run: |
           mkdir -p deps-tmp && cd deps-tmp
-          BASE_URL="http://ports.ubuntu.com/ubuntu-ports/pool/main"
+          # Добавляем архитектуру и обновляем списки пакетов
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
           
-          # Полный список "запчастей"
-          PKGS=(
-            "libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb"
-            "libx/libx11/libx11-6_1.8.7-1build1_arm64.deb"
-            "x/xorgproto/x11proto-dev_2023.2-1_all.deb"
-            "libx/libxext/libxext-dev_1.3.4-1build2_arm64.deb"
-            "libx/libxrender/libxrender-dev_0.9.10-1.1build1_arm64.deb"
-            "libx/libxtst/libxtst-dev_1.2.3-1build4_arm64.deb"
-            "a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb"
-            "c/cups/libcups2-dev_2.4.7-1.2ubuntu7_arm64.deb"
-            "f/fontconfig/libfontconfig-dev_2.15.0-1.1ubuntu2_arm64.deb"
-            "libf/libffi/libffi-dev_3.4.6-1_arm64.deb"
-          )
+          # Скачиваем реальные пакеты для ARM64
+          apt-get download \
+            libx11-dev:arm64 \
+            libxext-dev:arm64 \
+            libxrender-dev:arm64 \
+            libxtst-dev:arm64 \
+            libasound2-dev:arm64 \
+            libcups2-dev:arm64 \
+            libfontconfig1-dev:arm64 \
+            libffi-dev:arm64 \
+            x11proto-dev
           
-          for pkg in "${PKGS[@]}"; do curl -L -O "$BASE_URL/$pkg"; done
+          # Распаковываем дебиан-пакеты в текущую папку
           for f in *.deb; do dpkg-deb -x $f .; done
           
-          # Инъекция в системные пути
+          # Копируем заголовки и библиотеки в системные пути кросс-компилятора
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
           
-          # Фикс иерархии
+          # Фикс структуры папок для Configure (чтобы видел alsa/asoundlib.h и т.д.)
           for dir in alsa cups fontconfig X11; do
             sudo mkdir -p /usr/include/$dir
-            [ -d usr/include/$dir ] && sudo cp -r usr/include/$dir/* /usr/include/$dir/ || true
+            if [ -d usr/include/$dir ]; then
+              sudo cp -r usr/include/$dir/* /usr/include/$dir/
+            fi
           done
 
       - name: Configure OpenJDK
         env:
           PKG_CONFIG_ALLOW_CROSS: 1
+          # Явные пути для компилятора, чтобы он "увидел" наши инъекции
           C_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
           CPLUS_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
           LIBRARY_PATH: /usr/lib/aarch64-linux-gnu
@@ -80,9 +83,7 @@ jobs:
             --with-giflib=bundled \
             --with-lcms=bundled \
             --with-harfbuzz=bundled \
-            --with-libffi=bundled \
-            --with-extra-cflags="-O3 -march=armv8-a" \
-            --with-extra-cxxflags="-O3 -march=armv8-a"
+            --with-libffi=bundled
           
       - name: Build Images
         run: |
@@ -92,10 +93,12 @@ jobs:
       - name: Archive and Upload
         if: success()
         run: |
+          # Ищем готовую сборку в папке build
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           
       - name: Upload Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Java25-Final-AArch64

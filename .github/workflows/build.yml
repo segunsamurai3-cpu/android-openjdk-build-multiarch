@@ -16,19 +16,19 @@ jobs:
           libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev \
           libasound2-dev openjdk-21-jdk gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
-      - name: Clone OpenJDK 25
+      - name: Clone OpenJDK 25 (Stable Branch)
         run: |
-          git clone --depth 1 https://github.com/openjdk/jdk jdk-source
+          # Теперь скачиваем именно 25-ю версию, а не самую последнюю
+          git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
       - name: Apply Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, continuing anyway"
+          patch -p1 < ../patches/jdk25u_android.diff || echo "Patch failed, continuing"
 
-      - name: Configure OpenJDK
+      - name: Configure OpenJDK 25
         run: |
           cd jdk-source
-          # Важно: используем чистый bash configure без лишних оберток
           bash configure \
             --openjdk-target=aarch64-linux-gnu \
             --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \

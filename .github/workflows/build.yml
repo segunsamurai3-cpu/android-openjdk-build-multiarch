@@ -25,26 +25,26 @@ jobs:
         run: |
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
-      - name: Force Download X11 (Manual Injection)
+      - name: Force Inject X11 & ALSA (ARM64)
         run: |
-          mkdir -p x11-tmp
-          cd x11-tmp
-          # Скачиваем актуальные версии напрямую
+          mkdir -p deps-tmp
+          cd deps-tmp
+          # Скачиваем X11 и ALSA (звук) напрямую для ARM64
           curl -L -o x1.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb
           curl -L -o x2.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.8.7-1build1_arm64.deb
           curl -L -o x3.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-dev_2023.2-1_all.deb
+          curl -L -o a1.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb
+          curl -L -o a2.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_arm64.deb
           
           for f in *.deb; do dpkg-deb -x $f .; done
           
-          # Вместо передачи путей в configure, копируем файлы туда, где их ищет компилятор
-          sudo cp -r usr/include/* /usr/lib/gcc-cross/aarch64-linux-gnu/13/include-fixed/ || true
+          # Инъекция файлов в системные пути кросс-компилятора
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
 
       - name: Configure OpenJDK
         run: |
           cd jdk-source
-          # Оставляем только те флаги, которые он ТОЧНО понимает
           bash configure \
             --openjdk-target=aarch64-linux-gnu \
             --with-boot-jdk=$JAVA_HOME \
@@ -54,7 +54,8 @@ jobs:
             --with-jvm-variants=server \
             --with-native-debug-symbols=none \
             --with-freetype=bundled \
-            --with-x=yes
+            --with-x=yes \
+            --with-alsa=yes
           
       - name: Build Images
         run: |

@@ -23,21 +23,21 @@ jobs:
       - name: Apply Your Patch
         run: |
           cd jdk-source
-          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Патч не применился, пробуем без него"
+          patch -p1 < ../patches/jdk25u_android.diff || patch -p0 < ../patches/jdk25u_android.diff || echo "Patch failed, skipping"
 
       - name: Configure OpenJDK
         run: |
           cd jdk-source
           bash autogen.sh
-          # Исправленные флаги для OpenJDK 25
+          # Пробуем максимально упрощенный синтаксис для JDK 25
           bash configure \
             --with-boot-jdk=/usr/lib/jvm/java-21-openjdk-amd64 \
+            --openjdk-target=aarch64-linux-gnu \
             --with-debug-level=release \
             --disable-warnings-as-errors \
             --enable-headless-only \
-            --openjdk-target=aarch64-linux-gnu \
             --with-jvm-variants=server \
-            --with-native-debug-symbols=none
+            --with-native-debug-symbols=none || (cat config.log && exit 1)
           
       - name: Build Images
         run: |
@@ -47,7 +47,6 @@ jobs:
       - name: Archive and Upload
         if: success()
         run: |
-          # Переходим в папку с результатом, пакуем и загружаем
           cd jdk-source/build/*/images
           tar -cJf ../../../../jdk25-android-aarch64.tar.xz jdk
           

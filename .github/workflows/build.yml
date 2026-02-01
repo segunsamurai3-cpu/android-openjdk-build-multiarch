@@ -25,20 +25,31 @@ jobs:
         run: |
           git clone --depth 1 -b jdk-25+0 https://github.com/openjdk/jdk jdk-source
 
-      - name: Force Inject X11 & ALSA (ARM64)
+      - name: Force Inject All Dependencies (ARM64)
         run: |
-          mkdir -p deps-tmp
-          cd deps-tmp
-          # Скачиваем X11 и ALSA (звук) напрямую для ARM64
-          curl -L -o x1.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb
-          curl -L -o x2.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/libx/libx11/libx11-6_1.8.7-1build1_arm64.deb
-          curl -L -o x3.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xorgproto/x11proto-dev_2023.2-1_all.deb
-          curl -L -o a1.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb
-          curl -L -o a2.deb http://ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_arm64.deb
+          mkdir -p deps-tmp && cd deps-tmp
+          # Список всех "вредных" библиотек для ARM64
+          PKGS=(
+            "libx11-dev_1.8.7-1build1_arm64.deb" "libx11-6_1.8.7-1build1_arm64.deb"
+            "x11proto-dev_2023.2-1_all.deb" "libasound2-dev_1.2.11-1build2_arm64.deb"
+            "libasound2t64_1.2.11-1build2_arm64.deb" "libcups2-dev_2.4.7-1.2ubuntu7_arm64.deb"
+            "libcups2t64_2.4.7-1.2ubuntu7_arm64.deb" "libfontconfig1-dev_2.15.0-1.1ubuntu2_arm64.deb"
+            "libfontconfig1_2.15.0-1.1ubuntu2_arm64.deb"
+          )
+          
+          BASE_URL="http://ports.ubuntu.com/ubuntu-ports/pool/main"
+          # Скачиваем всё по списку (с распределением по папкам пулов Ubuntu)
+          curl -L -O "$BASE_URL/libx/libx11/libx11-dev_1.8.7-1build1_arm64.deb"
+          curl -L -O "$BASE_URL/libx/libx11/libx11-6_1.8.7-1build1_arm64.deb"
+          curl -L -O "$BASE_URL/x/xorgproto/x11proto-dev_2023.2-1_all.deb"
+          curl -L -O "$BASE_URL/a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb"
+          curl -L -O "$BASE_URL/a/alsa-lib/libasound2t64_1.2.11-1build2_arm64.deb"
+          curl -L -O "$BASE_URL/c/cups/libcups2-dev_2.4.7-1.2ubuntu7_arm64.deb"
+          curl -L -O "$BASE_URL/c/cups/libcups2t64_2.4.7-1.2ubuntu7_arm64.deb"
+          curl -L -O "$BASE_URL/f/fontconfig/libfontconfig-dev_2.15.0-1.1ubuntu2_arm64.deb"
           
           for f in *.deb; do dpkg-deb -x $f .; done
-          
-          # Инъекция файлов в системные пути кросс-компилятора
+          # Инъекция файлов в системные пути
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
 
@@ -54,7 +65,15 @@ jobs:
             --with-jvm-variants=server \
             --with-native-debug-symbols=none \
             --with-freetype=bundled \
+            --with-zlib=bundled \
+            --with-libpng=bundled \
+            --with-libjpeg=bundled \
+            --with-giflib=bundled \
+            --with-lcms=bundled \
+            --with-harfbuzz=bundled \
             --with-x=yes \
+            --with-cups=yes \
+            --with-fontconfig=yes \
             --with-alsa=yes
           
       - name: Build Images

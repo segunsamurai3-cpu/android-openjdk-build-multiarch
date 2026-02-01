@@ -9,12 +9,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Build Tools
+      - name: Install Build Tools & Cross-Libs
         run: |
+          sudo dpkg --add-architecture arm64
           sudo apt update
-          sudo apt -y install autoconf bash build-essential libx11-dev libxext-dev \
-          libxrender-dev libxtst-dev libxt-dev libcups2-dev libfontconfig1-dev \
-          libasound2-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt -y install autoconf bash build-essential openjdk-21-jdk \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          libx11-dev:arm64 libxext-dev:arm64 libxrender-dev:arm64 \
+          libxtst-dev:arm64 libxt-dev:arm64 libcups2-dev:arm64 \
+          libfontconfig1-dev:arm64 libasound2-dev:arm64 libfreetype6-dev:arm64
 
       - name: Setup Boot JDK (Java 24)
         uses: actions/setup-java@v4
@@ -42,9 +45,8 @@ jobs:
             --enable-headless-only \
             --with-jvm-variants=server \
             --with-native-debug-symbols=none \
-            --with-x=no \
-            --without-x
-
+            --with-freetype=system
+          
       - name: Build Images
         run: |
           cd jdk-source

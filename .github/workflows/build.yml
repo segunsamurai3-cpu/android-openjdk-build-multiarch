@@ -28,42 +28,42 @@ jobs:
       - name: Force Inject Dependencies (ARM64)
         run: |
           mkdir -p deps-tmp && cd deps-tmp
-          
-          # Настраиваем репозитории для ARM64 (используем ports.ubuntu.com)
           sudo dpkg --add-architecture arm64
+          
+          # Настройка репозиториев Ports для ARM64
           sudo bash -c 'cat <<EOF > /etc/apt/sources.list.d/arm64-ports.list
           deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
           deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
-          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
           EOF'
-          
-          # Исключаем arm64 из основного списка, чтобы не было 404
           sudo sed -i "s/deb http/deb [arch=amd64] http/g" /etc/apt/sources.list.d/ubuntu.sources || true
           
-          sudo apt-get update || true # Игнорируем мелкие ошибки обновления
+          sudo apt-get update || true
           
-          # Скачиваем пакеты
+          # Скачиваем Fontconfig и связанные библиотеки
           apt-get download \
             libx11-dev:arm64 libxext-dev:arm64 libxrender-dev:arm64 \
             libxtst-dev:arm64 libasound2-dev:arm64 libcups2-dev:arm64 \
-            libfontconfig1-dev:arm64 libffi-dev:arm64 x11proto-dev
+            libfontconfig-dev:arm64 libfontconfig1:arm64 \
+            libfreetype-dev:arm64 libffi-dev:arm64 x11proto-dev
           
           for f in *.deb; do dpkg-deb -x $f .; done
           
-          # Инъекция файлов
+          # Массовое копирование в пути кросс-компилятора
           sudo cp -r usr/include/* /usr/include/aarch64-linux-gnu/ || true
           sudo cp -r usr/lib/aarch64-linux-gnu/* /usr/lib/aarch64-linux-gnu/ || true
           
-          for dir in alsa cups fontconfig X11; do
-            sudo mkdir -p /usr/include/$dir
-            [ -d usr/include/$dir ] && sudo cp -r usr/include/$dir/* /usr/include/$dir/ || true
-          done
+          # Специальный фикс для Fontconfig: он ищет либо в корне, либо в подпапке
+          sudo mkdir -p /usr/include/fontconfig /usr/include/freetype2
+          [ -d usr/include/fontconfig ] && sudo cp -r usr/include/fontconfig/* /usr/include/fontconfig/ || true
+          [ -d usr/include/freetype2 ] && sudo cp -r usr/include/freetype2/* /usr/include/freetype2/ || true
+          # Делаем копию freetype2 в стандартный путь, так как fontconfig.h часто его там ждет
+          sudo cp -r /usr/include/freetype2/* /usr/include/ || true
 
       - name: Configure OpenJDK
         env:
           PKG_CONFIG_ALLOW_CROSS: 1
-          C_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
-          CPLUS_INCLUDE_PATH: /usr/include/aarch64-linux-gnu
+          C_INCLUDE_PATH: /usr/include/aarch64-linux-gnu:/usr/include/freetype2
+          CPLUS_INCLUDE_PATH: /usr/include/aarch64-linux-gnu:/usr/include/freetype2
           LIBRARY_PATH: /usr/lib/aarch64-linux-gnu
         run: |
           cd jdk-source
